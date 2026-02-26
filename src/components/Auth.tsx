@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Mail, Lock, LogIn, UserPlus, Github } from 'lucide-react';
+import { Mail, Lock, LogIn, UserPlus } from 'lucide-react';
 
 export function Auth() {
   const [loading, setLoading] = useState(false);
