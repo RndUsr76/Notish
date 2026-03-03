@@ -1,15 +1,30 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-// Use Deno's native way to handle base64 to avoid memory issues
-import { encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+import { encode } from 'https://deno.land/std@0.168.0/encoding/base64.ts';
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
 
-// Restricted list to avoid timeouts (trying too many models takes too long)
-const MODELS_TO_TRY = [
-  'gemini-flash-latest',
-  'gemini-2.0-flash-lite',
-  'gemini-1.5-flash'
-];
+const TIMEOUT_MS = 25000;
+
+async function getAvailableModels(): Promise<string[]> {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`
+  );
+  if (!res.ok) throw new Error(`ListModels failed: ${res.status}`);
+  const { models } = await res.json();
+
+  return (models as any[])
+    .filter((m) => m.supportedGenerationMethods?.includes('generateContent'))
+    .map((m) => m.name.replace('models/', '') as string)
+    .sort((a, b) => {
+      // Prefer flash models, prefer newer versions
+      const rank = (name: string) => {
+        if (name.includes('2.0') && name.includes('flash')) return 0;
+        if (name.includes('flash')) return 1;
+        return 2;
+      };
+      return rank(a) - rank(b);
+    });
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -44,64 +59,72 @@ serve(async (req: Request) => {
     const audioFile = formData.get('audio') as File;
     if (!audioFile) throw new Error('No audio file provided');
 
-    // Efficient base64 encoding
     const audioBuffer = await audioFile.arrayBuffer();
     const audioBase64 = encode(audioBuffer);
     const mimeType = audioFile.type || 'audio/webm';
-    
-    let lastError = null;
-    
-    for (const modelId of MODELS_TO_TRY) {
+
+    const availableModels = await getAvailableModels();
+    console.log('Available models:', availableModels.slice(0, 5).join(', '));
+
+    let lastError = 'All models failed';
+
+    for (const modelId of availableModels) {
       try {
         console.log(`Trying ${modelId}...`);
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${GEMINI_API_KEY}`;
-        
+
         const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
           body: JSON.stringify({
             contents: [{
               parts: [
                 { inline_data: { mime_type: mimeType, data: audioBase64 } },
-                { text: STRUCTURING_PROMPT }
-              ]
+                { text: STRUCTURING_PROMPT },
+              ],
             }],
-            generationConfig: { temperature: 0.3, maxOutputTokens: 2048 }
+            generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
           }),
         });
+
+        clearTimeout(timeout);
 
         const data = await response.json();
 
         if (response.ok) {
           const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
           if (text) {
-            return new Response(JSON.stringify({ success: true, structured_note: text, model: modelId }), {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 200
-            });
+            console.log(`Success with ${modelId}`);
+            return new Response(
+              JSON.stringify({ success: true, structured_note: text, model: modelId }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+            );
           }
         }
-        
+
         lastError = data.error?.message || `Status ${response.status}`;
         console.warn(`${modelId} failed: ${lastError}`);
-        
-        // If it's a 404 (not found), don't bother with other 1.5/2.0 names as they might also fail
-        if (response.status === 404) continue;
-        
-      } catch (e) {
-        lastError = e.message;
+
+      } catch (e: any) {
+        lastError = e.name === 'AbortError' ? `${modelId} timed out after ${TIMEOUT_MS / 1000}s` : e.message;
+        console.warn(lastError);
       }
     }
 
-    return new Response(JSON.stringify({ success: false, error: lastError }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200 // Return success:false instead of 5xx to keep client happy
-    });
+    return new Response(
+      JSON.stringify({ success: false, error: lastError }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+    );
 
   } catch (error: any) {
-    return new Response(JSON.stringify({ success: false, error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200
-    });
+    return new Response(
+      JSON.stringify({ success: false, error: error.message }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+    );
   }
 });
