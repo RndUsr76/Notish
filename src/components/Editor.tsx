@@ -2,10 +2,11 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Bold, Italic, List, ListOrdered, Heading1, Heading2, Trash2, CheckCircle2, Folder, ZoomIn, ZoomOut, Plus } from 'lucide-react';
 
 import { Extension } from '@tiptap/core';
+import { VoiceNoteButton } from './VoiceNoteButton';
 
 interface EditorProps {
   content: any;
@@ -55,6 +56,95 @@ const AutoHashtag = Extension.create({
   }
 });
 
+/**
+ * Converts a markdown string from the LLM to TipTap-compatible JSON.
+ */
+function markdownToTiptap(md: string): any {
+  const lines = md.split('\n');
+  const content: any[] = [];
+  let inList: 'bullet' | 'ordered' | null = null;
+  let listItems: any[] = [];
+
+  const flushList = () => {
+    if (inList && listItems.length > 0) {
+      content.push({
+        type: inList === 'ordered' ? 'orderedList' : 'bulletList',
+        content: listItems,
+      });
+      listItems = [];
+      inList = null;
+    }
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      flushList();
+      continue;
+    }
+
+    // Headings
+    const h1Match = trimmed.match(/^#\s+(.+)/);
+    const h2Match = trimmed.match(/^##\s+(.+)/);
+    if (h2Match) {
+      flushList();
+      content.push({
+        type: 'heading',
+        attrs: { level: 2 },
+        content: [{ type: 'text', text: h2Match[1] }],
+      });
+      continue;
+    }
+    if (h1Match) {
+      flushList();
+      content.push({
+        type: 'heading',
+        attrs: { level: 1 },
+        content: [{ type: 'text', text: h1Match[1] }],
+      });
+      continue;
+    }
+
+    // Bullet list
+    const bulletMatch = trimmed.match(/^[-*]\s+(.+)/);
+    if (bulletMatch) {
+      if (inList !== 'bullet') {
+        flushList();
+        inList = 'bullet';
+      }
+      listItems.push({
+        type: 'listItem',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: bulletMatch[1] }] }],
+      });
+      continue;
+    }
+
+    // Ordered list
+    const orderedMatch = trimmed.match(/^\d+\.\s+(.+)/);
+    if (orderedMatch) {
+      if (inList !== 'ordered') {
+        flushList();
+        inList = 'ordered';
+      }
+      listItems.push({
+        type: 'listItem',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: orderedMatch[1] }] }],
+      });
+      continue;
+    }
+
+    // Regular paragraph
+    flushList();
+    content.push({
+      type: 'paragraph',
+      content: [{ type: 'text', text: trimmed }],
+    });
+  }
+
+  flushList();
+  return { type: 'doc', content };
+}
+
 export function Editor({ content, project, allKeywords, allProjects, onUpdate, onUpdateProject, onZoomIn, onZoomOut, onDelete, isSaving, zoom }: EditorProps) {
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   const editor = useEditor({
@@ -72,6 +162,30 @@ export function Editor({ content, project, allKeywords, allProjects, onUpdate, o
       onUpdate(editor.getJSON(), editor.getText());
     },
   });
+
+  const handleVoiceResult = useCallback((structuredNote: string) => {
+    if (!editor) return;
+
+    const tiptapJson = markdownToTiptap(structuredNote);
+
+    // If the editor is empty, replace all content; otherwise append
+    const currentText = editor.getText().trim();
+    if (!currentText) {
+      editor.commands.setContent(tiptapJson);
+    } else {
+      // Insert at end
+      editor.commands.focus('end');
+      // Add a separator paragraph
+      editor.commands.insertContent([
+        { type: 'paragraph', content: [] },
+        { type: 'horizontalRule' },
+        ...tiptapJson.content,
+      ]);
+    }
+
+    // Trigger save
+    onUpdate(editor.getJSON(), editor.getText());
+  }, [editor, onUpdate]);
 
   useEffect(() => {
     if (editor && content) {
@@ -166,6 +280,8 @@ export function Editor({ content, project, allKeywords, allProjects, onUpdate, o
           >
             <ListOrdered size={18} />
           </button>
+          <div className="divider" />
+          <VoiceNoteButton onResult={handleVoiceResult} />
           <div className="divider" />
           <div className="zoom-controls">
             <button onClick={onZoomOut} className="toolbar-btn" title="Zoom Out">

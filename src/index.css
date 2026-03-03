@@ -799,6 +799,126 @@ button:focus {
   white-space: nowrap;
 }
 
+/* Voice Note Recording */
+.voice-btn {
+  color: var(--text-secondary) !important;
+}
+
+.voice-btn:hover {
+  color: #ef4444 !important;
+  background-color: rgba(239, 68, 68, 0.1) !important;
+}
+
+.voice-recording-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  padding: 6px 14px;
+  border-radius: 99px;
+  animation: voice-bar-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.voice-recording-bar.processing {
+  background-color: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.voice-recording-bar.done {
+  background-color: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.2);
+}
+
+.voice-recording-bar.error {
+  background-color: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.voice-pulse {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #ef4444;
+  animation: voice-pulse-anim 1.2s ease-in-out infinite;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+  flex-shrink: 0;
+}
+
+.voice-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.voice-error-text {
+  color: #ef4444 !important;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.voice-stop-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ef4444 !important;
+  flex-shrink: 0;
+}
+
+.voice-stop-btn:hover {
+  background-color: rgba(239, 68, 68, 0.15) !important;
+}
+
+.voice-cancel-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted) !important;
+  flex-shrink: 0;
+}
+
+.voice-cancel-btn:hover {
+  color: var(--text-secondary) !important;
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.voice-spinner {
+  animation: voice-spin 1s linear infinite;
+  color: var(--accent);
+}
+
+.voice-done-icon {
+  color: #22c55e;
+}
+
+.voice-error-icon {
+  color: #ef4444;
+  flex-shrink: 0;
+}
+
+@keyframes voice-pulse-anim {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.6; }
+}
+
+@keyframes voice-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes voice-bar-in {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
 /* Animations */
 @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
 
