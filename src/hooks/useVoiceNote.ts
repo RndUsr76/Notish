@@ -72,18 +72,23 @@ export function useVoiceNote(
         const formData = new FormData();
         formData.append('audio', audioBlob, 'recording.webm');
 
-        // Call the Supabase Edge Function using the SDK (handles auth headers)
-        const { data, error: invokeError } = await supabase.functions.invoke('voice-to-note', {
-          body: formData,
-        });
+        // Use fetch directly — supabase.functions.invoke drops auth headers with FormData
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/voice-to-note`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+            },
+            body: formData,
+          }
+        );
 
-        console.log('Edge Function Response:', { data, invokeError });
+        const data = await res.json();
+        console.log('Edge Function Response:', data);
 
-        if (invokeError) {
-          throw new Error(invokeError.message || 'Failed to call edge function');
-        }
-
-        if (!data || !data.success) {
+        if (!res.ok || !data.success) {
           throw new Error(data?.error || 'Failed to process voice note');
         }
 
