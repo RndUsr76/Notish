@@ -6,7 +6,8 @@ A premium, minimalist note-taking application designed for focus, organization, 
 Notish is built for users who want a high-performance, aesthetically pleasing workspace to capture thoughts. It focuses on three core pillars:
 1.  **Fast Entry**: Rich-text editing with automatic hashtag extraction.
 2.  **Voice Capture**: Speech-to-structured-text using Large Language Models (LLM).
-3.  **Automatic Organization**: Project-based folders and pervasive hashtag filtering.
+3.  **Keyword Generation**: Intelligent keyword extraction from note content to power filtering and organization.
+4.  **Automatic Organization**: Project-based folders and pervasive hashtag filtering.
 
 ---
 
@@ -25,7 +26,7 @@ Notish is built for users who want a high-performance, aesthetically pleasing wo
 
 ### AI Integration
 - **LLM**: Google Gemini 1.5/2.0 Flash (via Edge Functions).
-- **Capabilities**: Real-time audio transcription + intelligent markdown structuring.
+- **Capabilities**: Real-time audio transcription + intelligent markdown structuring + automated keyword extraction.
 
 ---
 
@@ -46,7 +47,15 @@ The app automatically extracts hashtags (e.g., `#idea`, `#todo`) from the note c
     - **Robustness**: Includes a fallback mechanism that rotates between model variants if one is overloaded (503) or rate-limited (429).
 4.  **Insertion**: The returned structured markdown is converted into TipTap JSON and inserted into the active note.
 
-### 4. Authentication & Security
+### 4. Keyword Generation Flow
+1.  **Analysis**: User triggers "Generate Keywords" via the editor toolbar (`useKeywords.ts`).
+2.  **LLM Processing**: The text content is sent to the `generate-keywords` Edge Function.
+3.  **Extraction**:
+    - The LLM identifies 3-5 major themes and searchable terms.
+    - Resulting keywords are appended as hashtags to the end of the note.
+    - **Self-Healing**: Automatically falls back to alternative Gemini models if the primary model reaches its quota limit.
+
+### 5. Authentication & Security
 - **Multi-tenancy**: Every note is tied to a `user_id`.
 - **Row Level Security (RLS)**: The database enforces that users can only read/write their own notes. Global API keys for Gemini are stored in Supabase Secrets, never exposed to the frontend.
 
@@ -56,7 +65,7 @@ The app automatically extracts hashtags (e.g., `#idea`, `#todo`) from the note c
 ```text
 /src
   /components      # UI Components (Editor, Sidebar, VoiceButton, etc.)
-  /hooks           # Business logic (useNotes for state, useVoiceNote for AI)
+  /hooks           # Business logic (useNotes for state, useVoiceNote/useKeywords for AI)
   /lib             # Supabase client and shared types
   /assets          # Static assets
 /supabase
@@ -84,6 +93,7 @@ The app automatically extracts hashtags (e.g., `#idea`, `#todo`) from the note c
 5.  Deploy the function:
     ```bash
     supabase functions deploy voice-to-note
+    supabase functions deploy generate-keywords --no-verify-jwt
     ```
 
 ### 3. Local Development
