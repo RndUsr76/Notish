@@ -3,11 +3,11 @@ import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Bold, Italic, List, ListOrdered, Heading1, Heading2, Trash2, CheckCircle2, Folder, ZoomIn, ZoomOut, Plus, Sparkles, Loader2 } from 'lucide-react';
+import { Bold, Italic, List, ListOrdered, Heading1, Heading2, Trash2, CheckCircle2, Folder, ZoomIn, ZoomOut, Plus, Wand2, Loader2 } from 'lucide-react';
 
 import { Extension } from '@tiptap/core';
 import { VoiceNoteButton } from './VoiceNoteButton';
-import { useKeywords } from '../hooks/useKeywords';
+import { useFixText } from '../hooks/useFixText';
 
 interface EditorProps {
   content: any;
@@ -148,7 +148,7 @@ function markdownToTiptap(md: string): any {
 
 export function Editor({ content, project, allKeywords, allProjects, onUpdate, onUpdateProject, onZoomIn, onZoomOut, onDelete, isSaving, zoom }: EditorProps) {
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
-  const { generateKeywords, isGenerating } = useKeywords();
+  const { fixText, isFixing } = useFixText();
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -189,49 +189,23 @@ export function Editor({ content, project, allKeywords, allProjects, onUpdate, o
     onUpdate(editor.getJSON(), editor.getText());
   }, [editor, onUpdate]);
 
-  const handleGenerateKeywords = useCallback(async () => {
+  const handleFixText = useCallback(async () => {
     if (!editor) return;
 
     const text = editor.getText();
     if (!text.trim()) return;
 
-    const keywords = await generateKeywords(text);
-    if (keywords && keywords.length > 0) {
-      const hashtags = keywords.map(k => `#${k.replace(/\s+/g, '-')}`).join(' ');
-      
-      // Focus the end
-      editor.commands.focus('end');
-      
-      // Handle the spacing (one empty line before keywords)
-      const currentText = editor.getText().trim();
-      if (currentText) {
-        // Add an empty paragraph as spacer, then another one with the hashtags
-        editor.commands.insertContent({ type: 'paragraph', content: [] });
-        editor.commands.insertContent({ 
-          type: 'paragraph', 
-          content: [{ type: 'text', text: hashtags }] 
-        });
-      } else {
-        editor.commands.setContent({ 
-          type: 'paragraph', 
-          content: [{ type: 'text', text: hashtags }] 
-        });
-      }
-      
-      // Trigger save
+    const fixed = await fixText(text);
+    if (fixed) {
+      const tiptapJson = markdownToTiptap(fixed);
+      editor.commands.setContent(tiptapJson);
       onUpdate(editor.getJSON(), editor.getText());
     }
-  }, [editor, generateKeywords, onUpdate]);
+  }, [editor, fixText, onUpdate]);
 
-  useEffect(() => {
-    if (editor && content) {
-      const currentJson = JSON.stringify(editor.getJSON());
-      const nextJson = JSON.stringify(content);
-      if (currentJson !== nextJson) {
-        editor.commands.setContent(content, false as any);
-      }
-    }
-  }, [content, editor]);
+
+
+
 
   if (!editor) return null;
 
@@ -320,19 +294,20 @@ export function Editor({ content, project, allKeywords, allProjects, onUpdate, o
           <VoiceNoteButton onResult={handleVoiceResult} />
           <div className="divider" />
           <button
-            onClick={handleGenerateKeywords}
-            disabled={isGenerating}
-            className={`toolbar-btn keyword-gen-btn ${isGenerating ? 'loading' : ''}`}
-            title="Generera keywords"
+            onClick={handleFixText}
+            disabled={isFixing}
+            className={`toolbar-btn keyword-gen-btn ${isFixing ? 'loading' : ''}`}
+            title="Fixa texten"
           >
-            {isGenerating ? (
+            {isFixing ? (
               <Loader2 size={18} className="animate-spin" />
             ) : (
-              <Sparkles size={18} />
+              <Wand2 size={18} />
             )}
-            <span className="btn-label">Generate Keywords</span>
+            <span className="btn-label">Fix text</span>
           </button>
           <div className="divider" />
+
           <div className="zoom-controls">
             <button onClick={onZoomOut} className="toolbar-btn" title="Zoom Out">
               <ZoomOut size={18} />

@@ -30,21 +30,20 @@ async function getAvailableModels(): Promise<string[]> {
     });
 }
 
-const SYSTEM_PROMPT = `Du är en expert på att extrahera sökordsinnehåll från personliga anteckningar.
-Ditt mål är att hjälpa användaren att organisera sina tankar genom att hitta mellan 3 och 5 relevanta sökord.
+const SYSTEM_PROMPT = `Du är en expert på att omstrukturera och förbättra text.
+Din uppgift är att ta korta, ofullständiga anteckningar eller stödord och skriva om dem till en sammanhängande, läsbar och välformulerad text.
 
 Instruktioner:
-1. Analysera texten noggrant för att förstå huvudteman, projekt eller ämnen.
-2. Extrahera 3-5 sökord som bäst sammanfattar innehållet.
-3. Sökorden ska vara "sökbara" – dvs. ord som användaren sannolikt skulle skriva i en sökruta för att hitta denna specifika anteckning igen.
-4. Prioritera ord som redan finns i texten, men skapa egna om det behövs för att ge en bättre sammanfattning.
-5. Analysera textens tema och ta fram keywords som på ett bra sätt sammanfattar texten och dess budskap.
-6. Sökorden ska vara på samma språk som texten (oftast svenska).
-7. Svara ENDAST med sökorden separerade med kommatecken. Inget annat.
+1. Bevara ALLA rubriker (headings, t.ex. # eller ##) exakt som de är, på samma plats. Stryk dem aldrig.
+2. Utvärdera om texten faktiskt mår bäst av att vara i punktform. Om det rör sig om väldigt kortfattad och kärnfull information (t.ex. en checklista eller uppräkningar), behåll punkterna och snygga bara till språket i dem. Gör endast om till löptext (brödtext) om det faktiskt ger mervärde och texten har en naturligt berättande struktur.
+3. Förbättra flytet och grammatiken utan att ändra grundbetydelsen.
+4. Hitta inte på ny information som saknas i originaltexten.
+5. Använd ett professionellt men naturligt och lättläst språk.
+6. Bevara textens ursprungliga språk.
+7. Svara ENDAST med den förbättrade texten formaterad i Markdown. Inga inledande fraser som "Här är texten".
+8. Använd INTE block av typen \`\`\`markdown runt svaret.
 
-Exempel:
-Text: "Idag planerade jag trädgården. Jag ska plantera morötter och tomater till våren."
-Output: trädgårdsplanering, odling, morötter, tomater, vårprojekt`;
+Här är texten som ska fixas:`;
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -80,12 +79,12 @@ serve(async (req: Request) => {
             contents: [{ 
               parts: [
                 { text: SYSTEM_PROMPT },
-                { text: `TEXT ATT ANALYSERA:\n${text}` }
+                { text: text }
               ] 
             }],
             generationConfig: { 
-              temperature: 0.2, 
-              maxOutputTokens: 150 
+              temperature: 0.4, 
+              maxOutputTokens: 2048 
             },
           }),
         });
@@ -94,10 +93,7 @@ serve(async (req: Request) => {
         if (response.ok) {
           const resultText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
           if (resultText) {
-            const keywords = resultText.split(',')
-              .map((k: string) => k.trim())
-              .filter((k: string) => k.length > 0 && k.length < 30); // Rimlig längd
-            return new Response(JSON.stringify({ success: true, keywords }), {
+            return new Response(JSON.stringify({ success: true, fixed_text: resultText }), {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 200,
             });
