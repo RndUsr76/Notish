@@ -2,7 +2,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Bold, Italic, List, ListOrdered, Heading1, Heading2, Trash2, CheckCircle2, Folder, ZoomIn, ZoomOut, Plus, Wand2, Loader2 } from 'lucide-react';
 
 import { Extension } from '@tiptap/core';
